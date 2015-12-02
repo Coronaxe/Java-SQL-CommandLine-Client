@@ -9,8 +9,6 @@ import java.util.HashMap;
 import java.util.Map.Entry;
 import java.util.Properties;
 
-import javax.security.auth.login.CredentialException;
-
 import at.coro.sql.SQLDriver;
 import at.coro.utils.ConfigManager;
 
