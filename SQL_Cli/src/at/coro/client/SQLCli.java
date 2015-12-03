@@ -13,19 +13,39 @@ import java.util.TreeMap;
 import at.coro.sql.SQLDriver;
 import at.coro.utils.ConfigManager;
 
+/**
+ * @author coro
+ *
+ */
 public class SQLCli {
 
-	private static final String version = "0.9a";
+	// static variable creation tab
+	// Version String to identify the build
+	private static final String version = "0.95a";
+	// Configuration Path String to indicate where the config file should be
+	// generated
 	private static final String cpath = "config.ini";
+	// Info String to put out to the user
 	private static final String info = "Java SQL Client Version " + version
 			+ "\n(c) 2015 Viktor Fuchs\n";
 
+	// Object creation tab
+	// SQLDriver Object (See SQLDriver auxiliary class)
 	protected SQLDriver sqld;
+	// ConfigManager Object (See ConfigManager auxiliary class)
 	private static ConfigManager cm = new ConfigManager(cpath);
+	// Properties Object to store information
 	private static Properties config = new Properties();
 
+	// Treemap Object to store the commands and the corresponding command
+	// description
 	private static TreeMap<String, String> commandList = new TreeMap<String, String>();
+	private static TreeMap<String, String> sqlCommands = new TreeMap<String, String>();
 
+	/**
+	 * Registers the commands into the Hashmap commandList for display. The
+	 * commands available not necessary reflect the commands in this list.
+	 */
 	private static void registerCommands() {
 		commandList.put("/help", "Displays this helptext");
 		commandList
@@ -39,8 +59,19 @@ public class SQLCli {
 						"Runs the specified script. If verbose is true, outputs the script as it is run. Optional.");
 		commandList.put("/clear", "Resets and deletes a saved configuration");
 		commandList.put("/exit", "Disconnects properly and quits the program");
+
+		sqlCommands.put("SELECT", "");
+		sqlCommands.put("SHOW", "");
 	}
 
+	/**
+	 * @param configuration
+	 * @return SQLDriver
+	 * @throws SQLException
+	 * 
+	 *             Creates a connection via the SQLDriver class and returns an
+	 *             SQLDriver Object for further use.
+	 */
 	private static SQLDriver createConnection(Properties configuration)
 			throws SQLException {
 		if (config.getProperty("password").equals("null")) {
@@ -58,6 +89,11 @@ public class SQLCli {
 
 	}
 
+	/**
+	 * @param credentials
+	 * 
+	 *            Updates the config object with the latest connection details.
+	 */
 	private static void updateConfig(String[] credentials) {
 		config.setProperty("host", credentials[0]);
 		config.setProperty("user", credentials[1]);
@@ -67,6 +103,13 @@ public class SQLCli {
 		}
 	}
 
+	/**
+	 * @param rs
+	 * @throws SQLException
+	 * 
+	 *             Outputs a ResultSet in a (somewhat) formatted form to the
+	 *             user. Working on the format!
+	 */
 	private static void listResults(ResultSet rs) throws SQLException {
 		int rc = 0;
 		for (int i = 1; i <= rs.getMetaData().getColumnCount(); i++) {
@@ -89,6 +132,11 @@ public class SQLCli {
 		System.out.println(rc + " rows selected");
 	}
 
+	/**
+	 * @param args
+	 * 
+	 *            Executes on program startup
+	 */
 	public static void main(String[] args) {
 		System.out.println(info);
 
@@ -147,7 +195,8 @@ public class SQLCli {
 				System.out.print("Database Selected: ");
 				ResultSet useddb = scli.sqld.getDatabase();
 				useddb.first();
-				if (useddb.getString(1) == "null") {
+				if (useddb.getString(1) == null
+						|| useddb.getString(1) == "null") {
 					System.out.println("None");
 				} else {
 					config.setProperty("db", useddb.getString(1));
@@ -161,7 +210,6 @@ public class SQLCli {
 					System.out.print(">");
 					cmd = br.readLine();
 				} while (cmd.isEmpty());
-				// System.out.println("Command is: " + cmd);
 				System.out.println();
 				if (cmd.toUpperCase().startsWith("/HELP")) {
 					System.out.println(info);
@@ -198,11 +246,11 @@ public class SQLCli {
 					while ((sCurrentLine = fbr.readLine()) != null) {
 						if (!sCurrentLine.startsWith("--")) {
 							concate += sCurrentLine;
+							if (parms.length > 1
+									&& parms[1].equalsIgnoreCase("true")) {
+								System.out.println(sCurrentLine);
+							}
 							if (sCurrentLine.endsWith(";")) {
-								if (parms.length > 1
-										&& parms[1].equalsIgnoreCase("true")) {
-									System.out.println(concate);
-								}
 								ResultSet trs = scli.sqld.autoExecute(concate);
 								concate = "";
 								if (trs != null) {
