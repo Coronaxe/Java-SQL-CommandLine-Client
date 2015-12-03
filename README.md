@@ -1,2 +1,2 @@
 # Java-SQL-CommandLine-Client
-It's in the title!
+This will be more informative some time soon! (:
