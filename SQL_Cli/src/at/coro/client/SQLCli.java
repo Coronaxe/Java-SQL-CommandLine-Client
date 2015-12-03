@@ -4,8 +4,6 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Map.Entry;
@@ -213,6 +211,7 @@ public class SQLCli {
 							}
 						}
 					}
+					fbr.close();
 				} else if (cmd.toUpperCase().startsWith("/SAVE")) {
 					System.out.println("Creating config...");
 					System.out.println("Saving config...");
