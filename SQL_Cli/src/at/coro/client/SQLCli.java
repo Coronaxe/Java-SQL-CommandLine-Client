@@ -1,13 +1,16 @@
 package at.coro.client;
 
 import java.io.BufferedReader;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.HashMap;
 import java.util.Map.Entry;
 import java.util.Properties;
+import java.util.TreeMap;
 
 import at.coro.sql.SQLDriver;
 import at.coro.utils.ConfigManager;
@@ -23,16 +26,19 @@ public class SQLCli {
 	private static ConfigManager cm = new ConfigManager(cpath);
 	private static Properties config = new Properties();
 
-	private static HashMap<String, String> commandList = new HashMap<String, String>();
+	private static TreeMap<String, String> commandList = new TreeMap<String, String>();
 
 	private static void registerCommands() {
-		commandList.put("/help", "Display this helptext");
+		commandList.put("/help", "Displays this helptext");
 		commandList
 				.put("/connect host username password [database]",
-						"Connects to new database, specify password as \"null\", if not set. Database is Optional.");
+						"Connects to new database, specify password as \"null\", if not set. Database is optional.");
 		commandList
 				.put("/save",
 						"Saves the current connection as configuration (WARNING: PASSWORD IS SAVED AS PLAIN TEXT!)");
+		commandList
+				.put("/script path_to_script [verbose]",
+						"Runs the specified script. If verbose is true, outputs the script as it is run. Optional.");
 		commandList.put("/clear", "Resets and deletes a saved configuration");
 		commandList.put("/exit", "Disconnects properly and quits the program");
 	}
@@ -45,6 +51,9 @@ public class SQLCli {
 		if (config.getProperty("db") == null) {
 			config.setProperty("db", "");
 		}
+		System.out.println("\nEstablishing connection to database "
+				+ config.getProperty("user") + "@" + config.getProperty("host")
+				+ "...");
 		return new SQLDriver(config.getProperty("host"),
 				config.getProperty("user"), config.getProperty("password"),
 				config.getProperty("db"));
@@ -58,6 +67,28 @@ public class SQLCli {
 		if (credentials.length > 3) {
 			config.setProperty("db", credentials[3]);
 		}
+	}
+
+	private static void listResults(ResultSet rs) throws SQLException {
+		int rc = 0;
+		for (int i = 1; i <= rs.getMetaData().getColumnCount(); i++) {
+			System.out.print(rs.getMetaData().getColumnLabel(i));
+			if (i < rs.getMetaData().getColumnCount()) {
+				System.out.print("\t|\t");
+			}
+		}
+		System.out.println();
+		while (rs.next()) {
+			rc++;
+			for (int i = 1; i <= rs.getMetaData().getColumnCount(); i++) {
+				System.out.print(rs.getObject(i));
+				if (i < rs.getMetaData().getColumnCount()) {
+					System.out.print("\t|\t");
+				}
+			}
+			System.out.println();
+		}
+		System.out.println(rc + " rows selected");
 	}
 
 	public static void main(String[] args) {
@@ -86,14 +117,16 @@ public class SQLCli {
 			}
 
 			scli.sqld = createConnection(config);
-			System.out.println("\nEstablishing connection to database "
-					+ config.getProperty("user") + "@"
-					+ config.getProperty("host") + "...");
 		} catch (SQLException e) {
 			System.err
 					.println("ERROR! SQL Connection could not be established.");
 			System.err.println("Cause: " + e.getMessage());
 			if (cm.configExists()) {
+				try {
+					Thread.sleep(1000);
+				} catch (InterruptedException e2) {
+					e2.printStackTrace();
+				}
 				System.out
 						.println("It may be the cause of a faulty configuration. Do you wish to delete it? Y/N");
 				try {
@@ -149,17 +182,36 @@ public class SQLCli {
 						System.out.println("Disconnecting...");
 						scli.sqld.disconnect();
 						updateConfig(credentials);
-						System.out
-								.println("\nEstablishing connection to database "
-										+ config.getProperty("user")
-										+ "@"
-										+ config.getProperty("host") + "...");
 						scli.sqld = createConnection(config);
 					} catch (SQLException sqle) {
 						System.err
 								.println("ERROR! SQL Connection could not be established.");
 						System.err.println("Cause: " + sqle.getMessage());
 						System.exit(0);
+					}
+				} else if (cmd.toUpperCase().startsWith("/SCRIPT")) {
+					String sCurrentLine;
+					String concate = "";
+					String[] parms = cmd.substring(cmd.indexOf(" ") + 1).split(
+							" ");
+					BufferedReader fbr = new BufferedReader(new FileReader(
+							parms[0]));
+					System.out.println("Executing Script " + parms[0] + "...");
+					while ((sCurrentLine = fbr.readLine()) != null) {
+						if (!sCurrentLine.startsWith("--")) {
+							concate += sCurrentLine;
+							if (sCurrentLine.endsWith(";")) {
+								if (parms.length > 1
+										&& parms[1].equalsIgnoreCase("true")) {
+									System.out.println(concate);
+								}
+								ResultSet trs = scli.sqld.autoExecute(concate);
+								concate = "";
+								if (trs != null) {
+									listResults(trs);
+								}
+							}
+						}
 					}
 				} else if (cmd.toUpperCase().startsWith("/SAVE")) {
 					System.out.println("Creating config...");
@@ -179,36 +231,20 @@ public class SQLCli {
 					System.exit(0);
 				} else if (cmd.toUpperCase().startsWith("SELECT")
 						|| cmd.toUpperCase().startsWith("SHOW")) {
-					int rc = 0;
 					ResultSet rs = scli.sqld.executeQuery(cmd);
-					for (int i = 1; i <= rs.getMetaData().getColumnCount(); i++) {
-						System.out.print(rs.getMetaData().getColumnLabel(i));
-						if (i < rs.getMetaData().getColumnCount()) {
-							System.out.print("\t|\t");
-						}
-					}
-					System.out.println();
-					while (rs.next()) {
-						rc++;
-						for (int i = 1; i <= rs.getMetaData().getColumnCount(); i++) {
-							System.out.print(rs.getObject(i));
-							if (i < rs.getMetaData().getColumnCount()) {
-								System.out.print("\t|\t");
-							}
-						}
-						System.out.println();
-					}
-					System.out.println(rc + " rows selected");
+					listResults(rs);
 				} else {
 					scli.sqld.execute(cmd);
 				}
 			} catch (IOException e) {
-				e.printStackTrace();
+				System.err.println("IO exception!");
+				System.err.println("Cause: " + e.getMessage());
 			} catch (SQLException e) {
 				System.err
 						.println("There was an exception. Please check your SQL Syntax!");
 				System.err.println("Cause: " + e.getMessage());
 				// e.printStackTrace();
+			} finally {
 				try {
 					Thread.sleep(100);
 				} catch (InterruptedException e1) {
