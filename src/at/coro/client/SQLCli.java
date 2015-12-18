@@ -94,13 +94,15 @@ public class SQLCli {
 	 * 
 	 *            Updates the config object with the latest connection details.
 	 */
-	private static void updateConfig(String[] credentials) {
-		config.setProperty("host", credentials[0]);
-		config.setProperty("user", credentials[1]);
-		config.setProperty("password", credentials[2]);
+	private static Properties updateConfig(String[] credentials) {
+		Properties tProp = new Properties();
+		tProp.setProperty("host", credentials[0]);
+		tProp.setProperty("user", credentials[1]);
+		tProp.setProperty("password", credentials[2]);
 		if (credentials.length > 3) {
-			config.setProperty("db", credentials[3]);
+			tProp.setProperty("db", credentials[3]);
 		}
+		return tProp;
 	}
 
 	/**
@@ -129,6 +131,13 @@ public class SQLCli {
 			}
 			System.out.println();
 		}
+		for (int i = 1; i <= rs.getMetaData().getColumnCount(); i++) {
+			System.out.print(rs.getMetaData().getColumnLabel(i));
+			if (i < rs.getMetaData().getColumnCount()) {
+				System.out.print("\t|\t");
+			}
+		}
+		System.out.println();
 		System.out.println(rc + " rows selected");
 	}
 
@@ -158,8 +167,12 @@ public class SQLCli {
 					if (credentials.length < 3) {
 						throw new SQLException("Invalid Credentials");
 					}
-					updateConfig(credentials);
+					config = updateConfig(credentials);
 				}
+			} else if (args.length < 3) {
+				throw new SQLException("Invalid Credentials");
+			} else {
+				config = updateConfig(args);
 			}
 
 			scli.sqld = createConnection(config);
@@ -227,7 +240,7 @@ public class SQLCli {
 						}
 						System.out.println("Disconnecting...");
 						scli.sqld.disconnect();
-						updateConfig(credentials);
+						config = updateConfig(credentials);
 						scli.sqld = createConnection(config);
 					} catch (SQLException sqle) {
 						System.err
